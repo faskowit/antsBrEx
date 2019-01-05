@@ -35,10 +35,9 @@ usage()
 {
 cat <<usagetext
 USAGE: ${0} 
-        -d          inputFSDir 
+        -i          inputFSDir 
         -o          outputDir 
-        -r (opt)    refBrain 
-        -n (opt)    numThread 
+        -t (opt)    refBrain  
 usagetext
 }
 
@@ -52,12 +51,15 @@ main()
 	# args
 
 	# Check the number of arguments. If none are passed, print help and exit.
-	NUMARGS=$#
-	if [ $NUMARGS -lt 2 ]; then
-		echo "Not enough args"
-		usage &>2 
+	if [[ "$#" -eq 0 ]]; then
+		usage >&2 
 		exit 1
 	fi
+
+	inputImg=''
+	outputDir=''
+	templateChoice=''
+	templateDir=''
 
 	# read in args
 	while getopts "a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:s:r:t:u:v:w:x:y:z:" OPTION
@@ -69,15 +71,17 @@ main()
 			o)
 				outputDir=$OPTARG
 				;;
+			d)  templateDir=$OPTARG
+				;;
 			t)
 				templateChoice=$OPTARG
 				;;
 			h) 
-				help_usage >&2
+				help_usage &>2
 	            exit 1
 	      		;;
 			?) # getopts issues an error message
-				usage >&2
+				usage &>2
 	            exit 1
 	      		;;
 	     esac
@@ -89,14 +93,35 @@ main()
 	############################################################################
 	# check args
 
+	exeDir=$(dirname "$(readlink -f "$0")")/
 
-	touch ${outputDir}/antsBrExNotes.txt
+	if [[ ! -f ${inputImg} ]]
+	then
+		echo "image does not exist"
+		exit 1
+	fi
+
+	mkdir -p ${outputDir} || { echo "cant make dir" ; exit 1 ; }
+
+	if [[ -z ${templateDir} ]]
+	then
+		templateDir=${outputDir}/template/
+		tempTemplate='True'
+	fi
+
+	if [[ -z ${templateChoice} ]]
+	then
+		templateChoice=NKI
+	fi
+
+	> ${outputDir}/antsBrExNotes.txt
+	OUT=${outputDir}/antsBrExNotes.txt
 
 	############################################################################
 	############################################################################
 	# check template, download if necessary
 
-	${PWD}/getTemplateData.sh ${templateChoice}
+	${exeDir}/getTemplateData.sh ${templateDir} ${templateChoice}
 
 	# read exist arg
 	exitArg=$?
@@ -106,37 +131,44 @@ main()
 		echo $str
 		log $str >> $OUT
 		exit 1
-	else
-		targTemplate=${outputDir}/targ.nii.gz
 	fi
+
+	targTemplate=${templateDir}/antsBrEx_${templateChoice}_T1w_template.nii.gz
+	targMask=${templateDir}/antsBrEx_${templateChoice}_T1w_mask.nii.gz
+	targExMask=${templateDir}/antsBrEx_${templateChoice}_T1w_exmask.nii.gz
 
 	############################################################################
 	############################################################################
 	# first, lets initialize with FSL linear xfm
 
-	#### in order to initialize 
-	cmd="${FSLDIR}/bin/flirt \
-		    -in ${inputImg} \
-		    -ref ${targTemplate} \
-		    -omat ${outputDir}/img_2_template.xfm \
-		    -out ${outputDir}/img_2_template.nii.gz \
-		    -dof 12 \
-		    -interp spline \
-	        -searchrx -60 60 \
-		    -searchry -60 60 \
-		    -searchrz -60 60 \
-	    "
-	echo $cmd
-    log $cmd >> $OUT
-	eval $cmd
+	if [[ ! -f ${outputDir}/img_2_template.nii.gz ]]
+	then
 
-	cmd="${FSLDIR}/bin/convert_xfm \
-		    -omat ${outputDir}/template_2_img.xfm \
-		    -inverse ${outputDir}/img_2_template.xfm \
-	    "
-	echo $cmd
-    log $cmd >> $OUT
-	eval $cmd
+		#### in order to initialize 
+		cmd="${FSLDIR}/bin/flirt \
+			    -in ${inputImg} \
+			    -ref ${targTemplate} \
+			    -omat ${outputDir}/img_2_template.xfm \
+			    -out ${outputDir}/img_2_template.nii.gz \
+			    -dof 12 \
+			    -interp spline \
+		        -searchrx -60 60 \
+			    -searchry -60 60 \
+			    -searchrz -60 60 \
+		    "
+		echo $cmd
+	    log $cmd >> $OUT
+		eval $cmd
+
+		cmd="${FSLDIR}/bin/convert_xfm \
+			    -omat ${outputDir}/template_2_img.xfm \
+			    -inverse ${outputDir}/img_2_template.xfm \
+		    "
+		echo $cmd
+	    log $cmd >> $OUT
+		eval $cmd
+
+	fi
 
 	############################################################################
 	############################################################################
@@ -149,22 +181,58 @@ main()
     #          <OPT_ARGS>
     #          -o outputPrefix
 
-    cmd="${PWD}/external/antsBrainExtraction.sh \
+    cmd="${exeDir}/external/antsBrainExtraction.sh \
     		-d 3 \
     		-a ${outputDir}/img_2_template.nii.gz \
-    		-e \
-    		-m \
-    		-o ${outDir}/antBE \
+    		-e ${targTemplate} \
+    		-m ${targMask} \
+    		-o ${outputDir}/antsBEtmp/ \
+    		-q 1 \
     	"
-    log $cmd >> $OUT
+    if [[ -f ${targExMask} ]]
+    then
+    	cmd="$cmd -f ${targExMask}"
+    fi
 
-    
+	echo $cmd
+    log $cmd >> $OUT
+	eval $cmd
 
 	############################################################################
 	############################################################################
 	# put the mask back into native space
 
+	antsOutMask=${outputDir}/antsBEtmp/BrainExtractionMask.nii.gz
 
+	if [[ ! -f ${antsOutMask} ]]
+	then
+		echo "ants brain extraction did not work, problem"
+		exit 1
+	fi
+
+	# apply the inverse xfm
+	cmd="${FSLDIR}/bin/flirt \
+			-in ${antsOutMask} \
+			-ref ${inputImg} \
+			-out ${outputDir}/antsBrEx_mask.nii.gz \
+			-applyxfm -init ${outputDir}/template_2_img.xfm \
+			-interp nearestneighbour \
+		"
+	echo $cmd
+    log $cmd >> $OUT
+	eval $cmd
+
+	# if that worked, we can cleanup
+	if [[ -f  ${outputDir}/antsBrEx_mask.nii.gz ]]
+	then
+		rm -r ${outputDir}/antsBEtmp/
+		rm ${outputDir}/img_2_template.nii.gz
+
+		if [[ "${tempTemplate}" = "True" ]]
+		then 
+			rm -r ${templateDir}
+		fi
+	fi
 
 	############################################################################
 	############################################################################
@@ -178,4 +246,5 @@ main()
 } # main
 
 # run main
-main
+main "$@"
+

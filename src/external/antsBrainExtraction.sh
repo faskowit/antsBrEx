@@ -187,14 +187,18 @@ ANTS_MAX_ITERATIONS="100x100x70x20"
 ANTS_TRANSFORMATION="SyN[0.1,3,0]"
 ANTS_LINEAR_METRIC_PARAMS="1,32,Regular,0.25"
 ANTS_LINEAR_CONVERGENCE="[1000x500x250x100,1e-8,10]"
-ANTS_METRIC="CC"
+ANTS_METRIC="MI"
 ANTS_METRIC_PARAMS="1,4"
 
 WARP=${ANTSPATH}/antsApplyTransforms
 
 N4=${ANTSPATH}/N4BiasFieldCorrection
-N4_CONVERGENCE_1="[50x50x50x50,0.0000001]"
-N4_CONVERGENCE_2="[50x50x50x50,0.0000001]"
+# JOSH CHANGE
+# N4_CONVERGENCE_1="[50x50x50x50,0.0000001]"
+N4_CONVERGENCE_1="[50x50x25x10,0.0000001]"
+# JOSH CHANGE
+# N4_CONVERGENCE_2="[50x50x50x50,0.0000001]"
+N4_CONVERGENCE_2="[50x50x25x10,0.0000001]"
 N4_SHRINK_FACTOR_1=4
 N4_SHRINK_FACTOR_2=2
 N4_BSPLINE_PARAMS="[200]"
@@ -465,7 +469,8 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
           exe_initial_align="${exe_initial_align} -m Mattes[${EXTRACTION_INITIAL_AFFINE_FIXED},${EXTRACTION_INITIAL_AFFINE_MOVING},32,Regular,0.2]"
           exe_initial_align="${exe_initial_align} -t Affine[0.1]"
           exe_initial_align="${exe_initial_align} -s [20,0.12]"
-          exe_initial_align="${exe_initial_align} -g [40,0x40x40]"
+          # JOSH CHANGE
+          # exe_initial_align="${exe_initial_align} -g [40,0x40x40]"
           exe_initial_align="${exe_initial_align} -p 0"
           exe_initial_align="${exe_initial_align} -c 10"
           exe_initial_align="${exe_initial_align} -o ${EXTRACTION_INITIAL_AFFINE}"
