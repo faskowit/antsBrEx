@@ -21,13 +21,11 @@ help_usage()
 {
 cat <<helpusagetext
 USAGE: ${0} 
-        -d          inputFSDir --> input freesurfer directory
+        -i          inputImage --> input freesurfer directory
         -o          outputDir ---> output directory, will also write temporary 
                         files here 
-        -r (opt)    refBrain ----> file to be used as reference transforming 
-                        aparc+aseg.mgz out of FS conformed space (default=rawavg) 
-        -n (opt)    numThread ---> number of parallel processes to use when doing
-                        the label transfer (default=4)
+        -d (opt)    refBrainDir -> directory where reference brains could exist
+        -t (opt)    refBrain ----> NKI, NKIU10, OASIS, IXI, KIRBY, KIRBYMM
 helpusagetext
 }
 
@@ -35,8 +33,9 @@ usage()
 {
 cat <<usagetext
 USAGE: ${0} 
-        -i          inputFSDir 
-        -o          outputDir 
+        -i          inputImage 
+        -o          outputDir
+        -d 			refBrainDir
         -t (opt)    refBrain  
 usagetext
 }
