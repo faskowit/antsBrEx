@@ -36,7 +36,7 @@ USAGE: ${0}
         -i          inputImage 
         -o          outputDir
         -d 			refBrainDir
-        -t (opt)    refBrain  
+        -t (opt)    refBrain (def: NKI)
 usagetext
 }
 
@@ -76,11 +76,11 @@ main()
 				templateChoice=$OPTARG
 				;;
 			h) 
-				help_usage &>2
+				help_usage 1>&2
 	            exit 1
 	      		;;
 			?) # getopts issues an error message
-				usage &>2
+				usage 1>&2
 	            exit 1
 	      		;;
 	     esac
@@ -246,4 +246,3 @@ main()
 
 # run main
 main "$@"
-
